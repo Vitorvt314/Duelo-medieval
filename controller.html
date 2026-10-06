@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Duelo Medieval: Controle</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1410; color: #f3e6c8; font-family: Georgia, "Times New Roman", serif; overscroll-behavior: none; }
+  .screen { position: fixed; inset: 0; display: none; }
+  .screen.on { display: flex; }
+  button { font: inherit; cursor: pointer; }
+
+  /* Entrada */
+  #join { flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center; }
+  #join h1 { margin: 0; font-size: 30px; letter-spacing: 1px; color: #e8b84a; text-shadow: 0 2px 0 #000; }
+  #join input { font: inherit; font-size: 22px; padding: 12px 16px; width: min(320px, 90vw); border-radius: 10px; border: 2px solid #8a6a3a; background: #2a1f17; color: #f3e6c8; text-align: center; user-select: text; -webkit-user-select: text; touch-action: auto; }
+  .big { font-size: 22px; font-weight: bold; padding: 14px 34px; border-radius: 12px; border: 0; background: #c0392b; color: #fff; box-shadow: 0 5px 0 #6e1f17; }
+  .big:active { transform: translateY(4px); box-shadow: 0 1px 0 #6e1f17; }
+  .hint { opacity: .7; font-size: 15px; }
+
+  /* Controle */
+  #pad { flex-direction: column; }
+  #bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #0006; font-size: 15px; }
+  #swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; flex: none; }
+  #pname { font-weight: bold; white-space: nowrap; }
+  #net { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #2a6; color: #fff; white-space: nowrap; }
+  #net.off { background: #b33; }
+  #hpwrap { flex: 1; height: 14px; background: #000a; border-radius: 7px; overflow: hidden; border: 1px solid #fff4; min-width: 40px; }
+  #hp { height: 100%; width: 100%; background: linear-gradient(#5f5, #2a2); transition: width .15s; }
+  #score { font-weight: bold; color: #e8b84a; white-space: nowrap; }
+  #inv { display: flex; gap: 14px; justify-content: center; padding: 5px; font-size: 14px; opacity: .9; flex-wrap: wrap; }
+  #inv b { color: #e8b84a; }
+  /* Mega Buster: um botão por poder, com a barrinha de energia embaixo. */
+  #mmBar { display: none; gap: 6px; justify-content: center; padding: 2px 6px 8px; flex-wrap: wrap; }
+  #mmBar.on { display: flex; }
+  .mmc { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #0009; position: relative; color: #fff; font-weight: bold; font-size: 15px; text-shadow: 0 1px 0 #000a; padding: 0; }
+  .mmc.sel { outline: 3px solid #fff; outline-offset: 1px; transform: scale(1.12); }
+  .mmc.low { filter: grayscale(.8) brightness(.7); }
+  .mmc i { position: absolute; left: 4px; right: 4px; bottom: -7px; height: 4px; background: #000a; border-radius: 2px; overflow: hidden; }
+  .mmc i b { display: block; height: 100%; background: #ffe95a; }
+  #area { flex: 1; display: flex; position: relative; min-height: 0; }
+  #stick { flex: 1.2; position: relative; border-right: 1px dashed #fff1; }
+  #stickHint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: .3; font-size: 17px; pointer-events: none; text-align: center; padding: 10px; }
+  #base, #knob { position: absolute; border-radius: 50%; pointer-events: none; display: none; }
+  #base { width: 150px; height: 150px; margin: -75px 0 0 -75px; border: 3px solid #fff5; background: #fff1; }
+  #knob { width: 70px; height: 70px; margin: -35px 0 0 -35px; background: #f3e6c8; box-shadow: 0 0 12px #0008; }
+  /* Botões: deitado = [agarrar/dash] [atacar] [magia/especial]; em pé = magia+especial, atacar, agarrar+dash. */
+  #btns { flex: 1; display: grid; grid-template-areas: "grab atk mag" "dash atk sp"; gap: 10px 14px; padding: 10px; align-content: center; justify-content: center; align-items: center; justify-items: center; }
+  @media (orientation: portrait) { #btns { grid-template-areas: "mag sp" "atk atk" "grab dash"; } }
+  #grab { grid-area: grab; } #dash { grid-area: dash; } #atk { grid-area: atk; } #mag { grid-area: mag; } #sp { grid-area: sp; }
+  .act.small { width: min(84px, 19vw, 23vh); font-size: 13px; }
+  #grab { background: radial-gradient(circle at 35% 30%, #7ad8a0, #1a7a4a); box-shadow: 0 6px 0 #0a3a20; }
+  #grab.hold { outline: 3px solid #fff; filter: brightness(1.25); }
+  #dash { background: radial-gradient(circle at 35% 30%, #7ac8ff, #1a5aa8); box-shadow: 0 6px 0 #0a2a5a; }
+  #sp { position: relative; background: conic-gradient(#e8b84a calc(var(--sp, 0) * 360deg), #3a2a18 0); box-shadow: 0 6px 0 #1a1008; color: #fff; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+  #sp.ready { background: radial-gradient(circle at 35% 30%, #fff3b0, #ff9a2a); color: #fff; box-shadow: 0 6px 0 #6a3a08, 0 0 22px 6px #ffd84a; animation: pulse .25s infinite alternate; }
+  .act { width: min(150px, 34vw, 30vh); aspect-ratio: 1; border-radius: 50%; border: 0; font-size: 18px; font-weight: bold; color: #fff; text-shadow: 0 2px 0 #0008; }
+  #atk { background: radial-gradient(circle at 35% 30%, #ff6b5a, #a01d10); box-shadow: 0 7px 0 #5a0d06; width: min(140px, 30vw, 34vh); position: relative; }
+  /* Recarga: a parte escura do botão vai sumindo em sentido horário. */
+  #atk::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+                background: conic-gradient(rgba(10,6,4,.62) calc(var(--cd, 0) * 360deg), transparent 0); }
+  /* Força da bomba: anel em volta do botão enchendo e esvaziando enquanto segura. */
+  #atk.pw { background: radial-gradient(circle at 35% 30%, #ff6b5a, #a01d10 60%, transparent 61%), conic-gradient(var(--pwc, #ffe95a) calc(var(--pw, 0) * 360deg), #2a0804 0); font-size: 16px; }
+  #mag { background: radial-gradient(circle at 35% 30%, #9b7bff, #3d1ea8); box-shadow: 0 7px 0 #1f0d5c; position: relative; width: min(96px, 21vw, 25vh); font-size: 14px; }
+  /* Mira: ao arrastar o botão, um pontinho mostra a direção. */
+  .act::before { content: ""; position: absolute; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px #fff, 0 0 0 3px #0006;
+                 left: calc(50% - 12px + var(--ax, 0px)); top: calc(50% - 12px + var(--ay, 0px)); opacity: 0; transition: opacity .1s; pointer-events: none; z-index: 1; }
+  .act.aiming::before { opacity: 1; }
+  /* Carga do tiro: brilho em volta do botão (amarelo no nível 1, ciano no nível 2). */
+  #atk.ch1 { box-shadow: 0 7px 0 #5a0d06, 0 0 0 5px #ffe95a, 0 0 26px 6px #ffe95a99; }
+  #atk.ch2 { box-shadow: 0 7px 0 #5a0d06, 0 0 0 6px #5affd8, 0 0 34px 10px #5affd8aa; animation: pulse .18s infinite alternate; }
+  @keyframes pulse { to { filter: brightness(1.35); } }
+  .act.aiming { outline: 3px dashed #fff8; outline-offset: 6px; }
+  #aimHint { position: absolute; bottom: 6px; right: 10px; font-size: 12px; opacity: .45; pointer-events: none; }
+
+  .act.down { transform: translateY(5px); box-shadow: 0 2px 0 #0008 !important; filter: brightness(1.3); }
+  #mag.empty { filter: grayscale(.9) brightness(.6); }
+  #mag.throw { background: radial-gradient(circle at 35% 30%, #ffb35a, #a8561a); box-shadow: 0 7px 0 #5a2a08; font-size: 14px; }
+  /* Poder da arma (dourado) com recarga girando; trocar poder do Mega Buster (azul). */
+  #mag.skill { background: radial-gradient(circle at 35% 30%, #ffe27a, #b8860b); box-shadow: 0 7px 0 #6a4a05; font-size: 13px; padding: 8px; line-height: 1.15; }
+  #mag.mm { background: radial-gradient(circle at 35% 30%, #7ac8ff, #1a4a9a); box-shadow: 0 7px 0 #0a2a5a; font-size: 13px; }
+  #mag::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+                background: conic-gradient(rgba(10,6,4,.62) calc(var(--cd, 0) * 360deg), transparent 0); }
+
+  #overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000c; text-align: center; padding: 20px; z-index: 2; }
+  #overlay.on { display: flex; }
+  /* Celular deitado tem pouca altura: menu mais compacto e com rolagem. */
+  @media (max-height: 460px) {
+    #overlay { gap: 8px; padding: 10px; justify-content: flex-start; overflow-y: auto; touch-action: pan-y; }
+    #overlay * { touch-action: pan-y; }
+    #overlay h2 { font-size: 20px; }
+    #overlay .hint { font-size: 13px; }
+    .mode { padding: 6px 12px; font-size: 13px; }
+    .mode b { font-size: 15px; }
+    .big { padding: 10px 28px; font-size: 18px; }
+  }
+  #overlay h2 { margin: 0; color: #e8b84a; font-size: 26px; }
+  #modes { display: none; flex-direction: column; gap: 10px; align-items: center; }
+  #modes.on { display: flex; }
+  .modeRow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .arenaRow { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 12px; background: #2a1f17; border: 2px solid #4a3828; min-width: 260px; justify-content: space-between; }
+  .arenaRow small { display: block; font-size: 11px; letter-spacing: 2px; color: #b9a888; text-transform: uppercase; }
+  .arenaRow b { color: #f3e6c8; font-size: 16px; }
+  .arw { width: 40px; height: 40px; border-radius: 50%; border: 0; background: #4a3420; color: #f3e6c8; font-size: 22px; }
+  .mode { padding: 10px 16px; border-radius: 12px; border: 2px solid #8a6a3a; background: #2a1f17; color: #f3e6c8; font-size: 16px; text-align: left; max-width: 230px; }
+  .mode b { display: block; font-size: 18px; color: #e8b84a; }
+  .mode.sel { border-color: #e8b84a; background: #4a3420; box-shadow: 0 0 0 2px #e8b84a55; }
+
+  /* Seleção de armas */
+  #select { position: absolute; inset: 0; display: none; flex-direction: column; background: #1b1410; z-index: 3; }
+  #select.on { display: flex; }
+  #selHead { padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #2a1f17; font-size: 15px; }
+  #selHead b { color: #e8b84a; font-size: 18px; }
+  #grid { flex: 1; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-content: start; }
+  #grid * { touch-action: pan-y; }
+  .card { contain: layout paint; }
+  .cat { grid-column: 1 / -1; color: #e8b84a; font-weight: bold; font-size: 15px; margin-top: 4px; border-bottom: 1px solid #e8b84a44; padding-bottom: 2px; }
+  .card { background: #2a1f17; border: 2px solid #4a3828; border-radius: 12px; padding: 8px; display: flex; gap: 8px; align-items: center; text-align: left; color: inherit; }
+  .card.sel { border-color: #e8b84a; background: #4a3420; }
+  .card canvas { width: 56px; height: 56px; flex: none; }
+  /* Tela larga (PC/tablet): cartas e ícones maiores. */
+  @media (min-width: 900px) { #grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; padding: 16px; } .card { padding: 12px; gap: 12px; } .card canvas { width: 84px; height: 84px; } .card .nm { font-size: 18px; } .card .ds { font-size: 13px; } .cat { font-size: 19px; margin-top: 10px; } }
+  .card .nm { font-weight: bold; font-size: 15px; }
+  .card .ds { font-size: 12px; opacity: .75; margin: 2px 0 4px; }
+  .st { display: grid; grid-template-columns: 34px 1fr; gap: 1px 4px; font-size: 10px; opacity: .85; align-items: center; }
+  .bars { display: flex; gap: 2px; }
+  .bars i { width: 9px; height: 5px; background: #fff2; border-radius: 1px; }
+  .bars i.on { background: #e8b84a; }
+
+  /* Personagem: cor, roupa e chapéu */
+  .sec { font: inherit; font-size: 17px; padding: 10px 22px; border-radius: 12px; border: 2px solid #8a6a3a; background: #2a1f17; color: #f3e6c8; }
+  .sec:active { transform: translateY(2px); }
+  #custom { position: fixed; inset: 0; z-index: 10; display: none; flex-direction: column; background: #1b1410; }
+  #custom.on { display: flex; }
+  #cuHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: #2a1f17; }
+  #cuHead b { color: #e8b84a; font-size: 18px; }
+  #cuDone { font-size: 17px; padding: 8px 22px; box-shadow: 0 4px 0 #6e1f17; }
+  #cuDone.ok { background: #2a8a4a; box-shadow: 0 4px 0 #14502a; }
+  #cuBody { flex: 1; display: flex; min-height: 0; }
+  #cuLeft { width: 36%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: radial-gradient(circle at 50% 60%, #3a2c20, #1b1410 70%); }
+  #cuPrev { width: 100%; height: 100%; min-height: 0; flex: 1; }
+  #cuName { font-size: 13px; color: #b9a888; text-align: center; padding: 0 6px 8px; }
+  #cuSide { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #cuTabs { display: flex; gap: 6px; padding: 8px 10px 4px; }
+  #cuTabs button { flex: 1; font: inherit; font-size: 16px; padding: 8px; border-radius: 10px; border: 2px solid #4a3828; background: #2a1f17; color: #f3e6c8; }
+  #cuTabs button.on { border-color: #e8b84a; background: #4a3420; color: #e8b84a; }
+  #cuGrid { flex: 1; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 8px 10px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; align-content: start; }
+  #cuGrid * { touch-action: pan-y; }
+  .opt { font: inherit; background: #2a1f17; border: 2px solid #4a3828; border-radius: 12px; padding: 4px 2px 6px; color: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; position: relative; }
+  .opt canvas { width: 64px; height: 64px; }
+  .opt.sel { border-color: #e8b84a; background: #4a3420; }
+  .opt.taken { opacity: .35; }
+  .opt.taken::after { content: "em uso"; position: absolute; top: 26px; font-size: 11px; background: #000a; padding: 1px 5px; border-radius: 6px; }
+  @media (orientation: portrait) { #cuBody { flex-direction: column; } #cuLeft { width: 100%; height: 34vh; flex: none; } }
+</style>
+</head>
+<body>
+<script>
+// Aberto direto do disco (file://) nada funciona: sem servidor não há celulares nem armas.
+if (location.protocol === "file:") document.write('<div style="position:fixed;inset:0;z-index:999;background:#0d0a08;color:#f3e6c8;font:24px Georgia;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px">Este arquivo foi aberto direto do disco, assim o jogo não funciona.<br><br>Rode <b style="color:#e8b84a">&nbsp;python games/duelo/server.py&nbsp;</b> e abra<br><b style="color:#e8b84a">http://localhost:8090</b></div>');
+</script>
+<div id="join" class="screen on">
+  <h1>⚔️ Duelo Medieval</h1>
+  <input id="nameIn" maxlength="12" placeholder="Seu nome" autocomplete="off">
+  <input id="roomIn" maxlength="4" placeholder="Número da sala (na TV)" inputmode="numeric" autocomplete="off" style="display:none">
+  <div id="roomErr" class="hint" style="display:none;color:#ff8a7a"></div>
+  <button class="big" id="joinBtn">Entrar</button>
+  <div class="hint">Funciona em pé ou deitado, mas deitado é melhor</div>
+</div>
+
+<div id="pad" class="screen">
+  <div id="bar">
+    <div id="swatch"></div><span id="pname"></span><span id="net" class="off">conectando</span>
+    <div id="hpwrap"><div id="hp"></div></div>
+    <span id="score">0 ★</span>
+  </div>
+  <div id="inv">Arma: <b id="wpn">-</b> <span>Magia: <b id="mgc">nenhuma</b></span></div>
+  <div id="mmBar"></div>
+  <div id="area">
+    <div id="stick"><div id="stickHint">arraste aqui para<br>andar e mirar<br>(para cima = pular)</div><div id="base"></div><div id="knob"></div></div>
+    <div id="btns">
+      <button class="act small" id="grab">AGARRAR</button>
+      <button class="act small" id="dash">DASH</button>
+      <button class="act" id="atk">ATACAR</button>
+      <button class="act empty" id="mag">MAGIA</button>
+      <button class="act small" id="sp">ESPECIAL</button>
+    </div>
+    <div id="aimHint">arraste o botão para mirar · solte para disparar</div>
+    <div id="overlay">
+      <h2 id="ovTitle"></h2><div id="ovText" class="hint"></div>
+      <div id="modes">
+        <div class="modeRow">
+          <button class="mode" data-m="aleatorio"><b>🎲 Aleatório</b>Começa sem arma; armas caem do céu</button>
+          <button class="mode" data-m="escolha"><b>⚔️ Escolha</b>Cada um escolhe 1 de 100 armas</button>
+          <button class="mode" data-m="chefe"><b>👹 Chefão</b>Todos juntos contra 9 chefões</button>
+          <button class="mode" data-m="bomba"><b>💣 Bomba</b>Bata em alguém pra passar a bomba</button>
+          <button class="mode" data-m="zumbi"><b>🧟 Sobrevivência</b>Juntos contra hordas de zumbis</button>
+          <button class="mode" data-m="corrida"><b>💀 Corrida da Morte</b>Fuja da Morte até a chegada</button>
+        </div>
+        <div class="arenaRow">
+          <button class="arw" id="arPrev" aria-label="Arena anterior">‹</button>
+          <div><small>Arena</small><b id="arName">Aleatória</b></div>
+          <button class="arw" id="arNext" aria-label="Próxima arena">›</button>
+        </div>
+      </div>
+      <button class="big" id="startBtn">COMEÇAR</button>
+    </div>
+    <div id="select">
+      <div id="selHead"><b>Escolha sua arma</b><span id="selInfo"></span></div>
+      <div id="grid"></div>
+    </div>
+  </div>
+</div>
+
+<div id="custom">
+  <div id="cuHead"><b id="cuTitle">Seu personagem</b><button class="big" id="cuDone">PRONTO</button></div>
+  <div id="cuBody">
+    <div id="cuLeft"><canvas id="cuPrev"></canvas><div id="cuName"></div></div>
+    <div id="cuSide">
+      <div id="cuTabs"><button data-t="color" class="on">Cor</button><button data-t="outfit">Roupa</button><button data-t="hat">Chapéu</button></div>
+      <div id="cuGrid"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/looks.js"></script>
+<script src="/weapons.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+let myId = store.get("duelo_id");
+if (!myId) { myId = Math.random().toString(36).slice(2, 10); store.set("duelo_id", myId); }
+$("nameIn").value = store.get("duelo_name") || "";
+let look = (() => { try { return JSON.parse(store.get("duelo_look") || "null"); } catch { return null; } })();
+const savedLook = !!look;
+look = look || { color: LOOK_COLORS[Math.floor(Math.random() * 8)][0], hat: "elmo", outfit: "tunica" };
+let lookEdited = savedLook, lookT = 0, takenColors = [];
+
+// ── Conexão: reconecta sozinha se o Wi-Fi oscilar ou o celular bloquear a tela.
+let ws = null, joined = false, gen = 0, lastMsg = 0;
+// Online: a sala vem no QR code (?sala=1234); sem ela, o jogador digita o número que aparece na TV.
+let room = (new URLSearchParams(location.search).get("sala") || "").replace(/\D/g, "").slice(0, 4);
+fetch("/info").then(r => r.json()).then(i => { if (i.online && !room) $("roomIn").style.display = ""; }).catch(() => {});
+function roomError(txt) {
+  joined = false; gen++; if (ws) { try { ws.close(); } catch {} }
+  $("pad").classList.remove("on"); $("join").classList.add("on");
+  $("roomIn").style.display = ""; $("roomErr").textContent = txt; $("roomErr").style.display = "";
+}
+function connect() {
+  const my = ++gen;
+  if (ws) { try { ws.close(); } catch {} }
+  const name = $("nameIn").value.trim() || "Jogador";
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const s = new WebSocket(`${proto}://${location.host}/ws/pad?id=${encodeURIComponent(myId)}&name=${encodeURIComponent(name)}&room=${encodeURIComponent(room)}`);
+  ws = s;
+  const timeout = setTimeout(() => { if (s.readyState !== 1) s.close(); }, 4000);
+  s.onopen = () => { clearTimeout(timeout); setNet(true); lastMsg = Date.now(); if (lookEdited) s.send(JSON.stringify({ type: "look", ...look })); };
+  s.onmessage = (e) => { lastMsg = Date.now(); onMsg(JSON.parse(e.data)); };
+  s.onclose = () => {
+    clearTimeout(timeout);
+    if (my !== gen) return;
+    setNet(false);
+    if (joined) setTimeout(() => { if (my === gen) connect(); }, 800);
+  };
+}
+function setNet(ok) { $("net").textContent = ok ? "conectado" : "reconectando…"; $("net").classList.toggle("off", !ok); }
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+// A TV manda o estado várias vezes por segundo; se parar de chegar, a conexão travou.
+setInterval(() => { if (joined && ws && ws.readyState === 1 && Date.now() - lastMsg > 3000) connect(); }, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && joined && (!ws || ws.readyState !== 1)) connect(); });
+
+$("joinBtn").onclick = () => {
+  if ($("roomIn").style.display !== "none") {
+    room = $("roomIn").value.replace(/\D/g, "");
+    if (room.length !== 4) { $("roomErr").textContent = "Digite os 4 números da sala que aparecem na TV"; $("roomErr").style.display = ""; return; }
+    $("roomErr").style.display = "none";
+  }
+  store.set("duelo_name", $("nameIn").value.trim());
+  joined = true;
+  connect();
+  $("join").classList.remove("on");
+  $("pad").classList.add("on");
+  $("pname").textContent = $("nameIn").value.trim() || "Jogador";
+  showOverlay("Conectando…", "");
+  try { document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.("landscape").catch(() => {})).catch(() => {}); } catch {}
+};
+$("nameIn").addEventListener("keydown", (e) => { if (e.key === "Enter") $("joinBtn").click(); });
+
+function showOverlay(title, text, opts = {}) {
+  $("ovTitle").textContent = title; $("ovText").textContent = text || "";
+  $("startBtn").style.display = opts.start ? "" : "none";
+  $("modes").classList.toggle("on", !!opts.modes);
+  $("overlay").classList.add("on");
+}
+$("startBtn").onclick = () => send({ type: "start" });
+document.querySelectorAll(".mode").forEach(b => b.onclick = () => send({ type: "mode", m: b.dataset.m }));
+$("arPrev").onclick = () => send({ type: "arena", d: -1 });
+$("arNext").onclick = () => send({ type: "arena", d: 1 });
+
+// ── Recarga do ataque: a TV avisa quanto tempo a arma leva pra ficar pronta.
+let cdEnd = 0, cdDur = 1;
+function cdTick() {
+  const left = Math.max(0, cdEnd - performance.now());
+  $("atk").style.setProperty("--cd", (left / cdDur).toFixed(3));
+  if (left > 0) requestAnimationFrame(cdTick);
+}
+
+// ── Menu de seleção (montado uma vez, a partir de weapons.js)
+let built = "";
+function buildGrid(relics = []) {
+  const ids = [...SELECTABLE, ...RELICS.filter(r => relics.includes(r))];
+  if (built === ids.join()) return; built = ids.join();
+  const grid = $("grid"); grid.innerHTML = ""; let lastCat = "";
+  for (const id of ids) {
+    const w = WEAPONS[id];
+    if (w.cat !== lastCat) { lastCat = w.cat; const c = document.createElement("div"); c.className = "cat"; c.textContent = w.cat; grid.appendChild(c); }
+    const card = document.createElement("button"); card.className = "card"; card.dataset.w = id;
+    const cv = document.createElement("canvas"); cv.width = cv.height = 112;
+    drawWeaponIcon(cv.getContext("2d"), id, 56, 56, 92);
+    const bars = (n) => `<span class="bars">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</span>`;
+    const info = document.createElement("div");
+    info.innerHTML = `<div class="nm">${w.name}</div><div class="ds">${w.desc}</div>
+      <div class="st"><span>Dano</span>${bars(w.s[0])}<span>Veloc.</span>${bars(w.s[1])}<span>Alcance</span>${bars(w.s[2])}</div>`;
+    card.append(cv, info);
+    card.addEventListener("click", () => { send({ type: "choose", w: id }); try { navigator.vibrate?.(20); } catch {} });
+    grid.appendChild(card);
+  }
+}
+
+// Poderes do Mega Buster (mesma ordem da TV): letra e cor de cada um.
+const MMC = [["M", "#2a7ad8"], ["C", "#8a8f96"], ["G", "#b8501a"], ["I", "#2a5ad8"], ["B", "#2a9a3a"], ["F", "#d83a1a"], ["E", "#a8a03a"], ["T", "#8a3ac8"], ["O", "#3a3a4a"]];
+const MM_COST = [0, 2, 6, 2, 3, 2, 3, 10, 4];
+// Bombas Clássicas: comum, terra, ar, buraco negro e energia.
+const MCC = [["B", "#5aa83a"], ["T", "#d83a2a"], ["C", "#8a8f96"]];
+const BOMBC = [["N", "#3a4050"], ["T", "#8a5a2a"], ["A", "#4aa8d8"], ["B", "#4a1a7a"], ["E", "#c8a818"]];
+// Barra de poderes: set "mm" (Mega Buster, com energia) ou "bomb" (tipos de bomba).
+function renderMM(mm, set = "mm") {
+  const bar = $("mmBar"); bar.classList.toggle("on", !!mm);
+  if (!mm) return;
+  const list = set === "bomb" ? BOMBC : set === "mc" ? MCC : MMC;
+  if (bar.dataset.set !== set) {
+    bar.dataset.set = set; bar.innerHTML = "";
+    list.forEach(([l, c], i) => {
+      const b = document.createElement("button"); b.className = "mmc"; b.style.background = `radial-gradient(circle at 35% 30%, #fff8, ${c} 60%)`;
+      b.innerHTML = `${l}<i><b></b></i>`; if (!i || set !== "mm") b.querySelector("i").style.display = "none";
+      b.addEventListener("pointerdown", (e) => { e.preventDefault(); send({ type: set === "bomb" ? "bombT" : set === "mc" ? "mcT" : "mmPow", p: i }); try { navigator.vibrate?.(15); } catch {} });
+      bar.appendChild(b);
+    });
+  }
+  [...bar.children].forEach((b, i) => {
+    b.classList.toggle("sel", i === mm.p);
+    if (set === "mm") { b.classList.toggle("low", i > 0 && mm.en[i] < MM_COST[i]); b.querySelector("i b").style.width = (i ? mm.en[i] / 28 * 100 : 100) + "%"; }
+  });
+}
+let lastPhase = "";
+function onMsg(m) {
+  if (m.type === "noroom") return roomError("Essa sala não existe. Confira o número na TV.");
+  if (m.type === "roomfull") return roomError("Essa sala está cheia.");
+  if (m.type === "you") {
+    $("swatch").style.background = m.color;
+    // A TV é quem manda: se a cor pedida já estava em uso, ela fica com outra.
+    takenColors = m.taken || [];
+    if (performance.now() - lookT > 1500 && m.hat) {
+      const changed = look.color !== m.color || look.hat !== m.hat || look.outfit !== m.outfit;
+      look = { color: m.color, hat: m.hat, outfit: m.outfit };
+      if (changed && $("custom").classList.contains("on")) buildLookGrid();
+    }
+    $("hp").style.width = Math.max(0, m.hp / m.maxHp * 100) + "%";
+    $("hp").style.background = m.hp / m.maxHp > .35 ? "linear-gradient(#5f5,#2a2)" : "linear-gradient(#f66,#a22)";
+    $("score").textContent = m.score + " ★";
+    $("wpn").textContent = m.weapon || "-";
+    $("mgc").textContent = m.magic || "nenhuma";
+    // Sem magia e com arma na mão, o botão vira ARREMESSAR (joga a arma girando).
+    // Arma com poder especial: o botão vira PODER (com a recarga); Mega Buster: TROCAR PODER.
+    const sk = !m.magic && m.skill, mmOn = !m.magic && !!(m.mm || m.bomb || m.mc);
+    $("mag").textContent = m.magic ? "MAGIA" : m.bomb && mmOn ? "TROCAR BOMBA" : m.mc && mmOn ? "TROCAR ITEM" : mmOn ? "TROCAR PODER" : sk ? "⚡ " + sk.n : m.canThrow ? "ARREMESSAR" : "MAGIA";
+    $("mag").classList.toggle("empty", !m.magic && !m.canThrow && !sk && !mmOn);
+    $("mag").classList.toggle("throw", !m.magic && !sk && !mmOn && !!m.canThrow);
+    $("mag").classList.toggle("skill", !!sk);
+    $("mag").classList.toggle("mm", mmOn);
+    $("mag").style.setProperty("--cd", sk ? sk.cd : 0);
+    const live = m.alive && m.phase === "fight";
+    if (live && m.bomb) renderMM(m.bomb, "bomb"); else if (live && m.mc) renderMM(m.mc, "mc"); else renderMM(live ? m.mm : null, "mm");
+    // Barra do especial (enche batendo) e botão de agarrar.
+    $("sp").style.setProperty("--sp", Math.min(1, (m.sp || 0) / 100));
+    $("sp").classList.toggle("ready", (m.sp || 0) >= 100);
+    $("sp").textContent = (m.sp || 0) >= 100 ? "ESPECIAL!" : `${m.sp || 0}%`;
+    $("grab").textContent = m.grabbing ? "SEGURANDO" : "AGARRAR"; $("grab").classList.toggle("hold", !!m.grabbing);
+    document.querySelectorAll(".mode").forEach(b => b.classList.toggle("sel", b.dataset.m === m.mode));
+    if (m.arena) $("arName").textContent = m.arena;
+    ranged = !!m.ranged; chargeable = !!m.chargeable; powable = !!m.pow; holdable = !!m.hold;
+    if (holdable && m.fuel != null) $("atk").style.setProperty("--cd", (1 - m.fuel).toFixed(2));
+
+    // Tela de Personagens (TV mostra todos grandes; aqui escolhe cor, roupa e chapéu).
+    if (m.phase === "looks") {
+      if (!$("custom").classList.contains("on")) openLook();
+      $("cuDone").textContent = m.lookReady ? "✓ PRONTO" : "PRONTO"; $("cuDone").classList.toggle("ok", !!m.lookReady);
+      $("cuTitle").textContent = m.lookReady ? `Esperando os outros · ${m.timeLeft}s` : `Seu personagem · ${m.timeLeft}s`;
+    } else if ($("custom").classList.contains("on")) closeLook();
+    $("select").classList.toggle("on", m.phase === "select");
+    if (m.phase === "select") {
+      buildGrid(m.relics || []);
+      if (lastPhase !== "select") $("grid").scrollTop = 0;
+      if (window.lastChoice !== m.choice || lastPhase !== "select") { window.lastChoice = m.choice; document.querySelectorAll(".card").forEach(c => c.classList.toggle("sel", c.dataset.w === m.choice)); }
+      $("selInfo").textContent = m.choice ? `✓ ${WEAPONS[m.choice].name} · ${m.timeLeft}s` : `toque numa arma · ${m.timeLeft}s`;
+    }
+    if (m.phase === "lobby") showOverlay("Você entrou!", "Escolha o modo e a arena, e aperte COMEÇAR quando todos estiverem prontos", { start: true, modes: true });
+    else if (m.phase === "over") showOverlay(m.banner || "Fim de jogo", "Escolha o modo e aperte COMEÇAR para jogar de novo", { start: true, modes: true });
+    else if (m.phase === "fight" && !m.alive) showOverlay("💀 Você caiu!", "Espere a próxima rodada");
+    else if (m.phase === "between") showOverlay(m.banner || "Próxima rodada…", "", { between: true });
+    else $("overlay").classList.remove("on");
+    lastPhase = m.phase;
+  } else if (m.type === "chargeLost") {
+    chargeStart = performance.now(); const a = $("atk"); a.classList.remove("ch1", "ch2"); delete a.dataset.v1; delete a.dataset.v2;
+    try { navigator.vibrate?.([80, 40, 80]); } catch {}
+  } else if (m.type === "cd") {
+    cdDur = Math.max(1, m.ms); cdEnd = performance.now() + cdDur; requestAnimationFrame(cdTick);
+  } else if (m.type === "buzz") {
+    try { navigator.vibrate?.(m.ms || 60); } catch {}
+  }
+}
+
+// ── Joystick dinâmico: a base aparece onde o dedo encosta.
+const stick = $("stick"), base = $("base"), knob = $("knob");
+let stickTouch = null, ox = 0, oy = 0, jx = 0, jy = 0, lastSent = 0;
+const R = 60;
+function setKnob(x, y) { knob.style.left = x + "px"; knob.style.top = y + "px"; }
+function sendJoy() { send({ type: "joy", x: +jx.toFixed(2), y: +jy.toFixed(2) }); lastSent = performance.now(); }
+stick.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (stickTouch !== null) return;
+  stickTouch = e.pointerId;
+  try { stick.setPointerCapture(e.pointerId); } catch {}
+  const r = stick.getBoundingClientRect();
+  ox = e.clientX - r.left; oy = e.clientY - r.top;
+  base.style.left = ox + "px"; base.style.top = oy + "px";
+  base.style.display = knob.style.display = "block"; setKnob(ox, oy);
+  $("stickHint").style.display = "none";
+});
+stick.addEventListener("pointermove", (e) => {
+  if (e.pointerId !== stickTouch) return;
+  e.preventDefault();
+  const r = stick.getBoundingClientRect();
+  let dx = e.clientX - r.left - ox, dy = e.clientY - r.top - oy;
+  const d = Math.hypot(dx, dy);
+  if (d > R) { dx *= R / d; dy *= R / d; }
+  setKnob(ox + dx, oy + dy);
+  jx = dx / R; jy = dy / R;
+  if (performance.now() - lastSent > 33) sendJoy();
+});
+function release(e) {
+  if (e.pointerId !== stickTouch) return;
+  stickTouch = null; jx = jy = 0;
+  base.style.display = knob.style.display = "none";
+  sendJoy();
+}
+stick.addEventListener("pointerup", release);
+stick.addEventListener("pointercancel", release);
+setInterval(() => { if (stickTouch !== null) sendJoy(); }, 120);
+
+// ── Botões com mira: arraste o botão pra mirar e solte pra disparar.
+// Armas corpo a corpo golpeiam já no toque (arrastar e soltar dá outro golpe mirado).
+let holdable = false, holding = false;
+let ranged = false, chargeable = false, chargeStart = 0, chargeRaf = 0, powable = false, powStart = 0, powRaf = 0, powOn = false;
+// Força da bomba (mesma conta da TV): vai de 0 a 100% em 1s e volta; toque rápido = meia força.
+function powNow() { const t = (performance.now() - powStart) / 1000; if (t < .15) return .45; const u = t % 2; return Math.min(1, Math.max(.08, u < 1 ? u : 2 - u)); }
+function powLook() {
+  const a = $("atk"), p = powNow();
+  a.classList.add("pw"); a.style.setProperty("--pw", p.toFixed(3));
+  a.style.setProperty("--pwc", p < .5 ? "#5aff6a" : p < .8 ? "#ffe95a" : "#ff3a2a");
+  a.textContent = `FORÇA ${Math.round(p * 100)}%`;
+  powRaf = requestAnimationFrame(powLook);
+}
+function stopPow() { cancelAnimationFrame(powRaf); powOn = false; const a = $("atk"); a.classList.remove("pw"); a.textContent = "ATACAR"; }
+// Mostra no botão o nível da carga enquanto o dedo segura (os tempos batem com os da TV).
+function chargeLook() {
+  const t = (performance.now() - chargeStart) / 1000, a = $("atk");
+  a.classList.toggle("ch1", t >= .45 && t < 1.1); a.classList.toggle("ch2", t >= 1.1);
+  if (t >= .45 && !a.dataset.v1) { a.dataset.v1 = 1; try { navigator.vibrate?.(30); } catch {} }
+  if (t >= 1.1 && !a.dataset.v2) { a.dataset.v2 = 1; try { navigator.vibrate?.([40, 30, 40]); } catch {} }
+  chargeRaf = requestAnimationFrame(chargeLook);
+}
+function stopCharge() { cancelAnimationFrame(chargeRaf); const a = $("atk"); a.classList.remove("ch1", "ch2"); delete a.dataset.v1; delete a.dataset.v2; }
+for (const id of ["atk", "mag"]) {
+  const el = $(id), RR = 70;
+  let pid = null, sx = 0, sy = 0, ax = 0, ay = 0, aiming = false, lastAim = 0;
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (pid !== null) return;
+    pid = e.pointerId; try { el.setPointerCapture(pid); } catch {}
+    sx = e.clientX; sy = e.clientY; ax = ay = 0; aiming = false;
+    el.classList.add("down"); try { navigator.vibrate?.(15); } catch {}
+    if (id === "atk" && !ranged) send({ type: "btn", b: id, down: true });
+    if (id === "atk" && chargeable) { send({ type: "charge", on: true }); chargeStart = performance.now(); chargeLook(); }
+    if (id === "atk" && holdable) { holding = true; send({ type: "hold", on: true }); }
+    if (id === "atk" && powable) { send({ type: "pow", on: true }); powStart = performance.now(); powOn = true; powLook(); try { navigator.vibrate?.(20); } catch {} }
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== pid) return;
+    let dx = e.clientX - sx, dy = e.clientY - sy; const d = Math.hypot(dx, dy);
+    if (d > 14) aiming = true;
+    if (!aiming) return;
+    if (d > RR) { dx *= RR / d; dy *= RR / d; }
+    ax = dx / RR; ay = dy / RR;
+    el.style.setProperty("--ax", dx + "px"); el.style.setProperty("--ay", dy + "px"); el.classList.add("aiming");
+    const now = performance.now();
+    if (now - lastAim > 40) { lastAim = now; send({ type: "aim", on: true, x: +ax.toFixed(2), y: +ay.toFixed(2) }); }
+  });
+  const end = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null; el.classList.remove("down", "aiming");
+    if (id === "atk" && chargeable) stopCharge();
+    if (id === "atk" && powOn) stopPow();
+    if (id === "atk" && holding) { holding = false; send({ type: "hold", on: false }); if (aiming) send({ type: "aim", on: false }); return; }
+    if (id === "atk" && chargeable && e.type === "pointercancel") send({ type: "charge", on: false });
+    const shot = aiming ? { type: "btn", b: id, down: true, ax: +ax.toFixed(2), ay: +ay.toFixed(2) } : { type: "btn", b: id, down: true };
+    if (id === "mag" || ranged || aiming) send(shot);
+    if (aiming) send({ type: "aim", on: false });
+  };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+}
+// Agarrar e dash contam enquanto o dedo segura (soltar o agarrar = arremessar; segurar o dash = correr).
+for (const id of ["grab", "dash"]) {
+  const el = $(id); let pid = null;
+  el.addEventListener("pointerdown", (e) => { e.preventDefault(); if (pid !== null) return; pid = e.pointerId; try { el.setPointerCapture(pid); } catch {} el.classList.add("down"); send({ type: id, on: true }); try { navigator.vibrate?.(15); } catch {} });
+  const up = (e) => { if (e.pointerId !== pid) return; pid = null; el.classList.remove("down"); send({ type: id, on: false }); };
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+}
+$("sp").addEventListener("pointerdown", (e) => { e.preventDefault(); send({ type: "btn", b: "sp", down: true }); try { navigator.vibrate?.(30); } catch {} });
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// ── Tela "Personagem": cor, roupa e chapéu, com prévia animada.
+let cuTab = "color", cuRaf = 0;
+const LISTS = { color: LOOK_COLORS, outfit: LOOK_OUTFITS, hat: LOOK_HATS };
+function openLook() { $("custom").classList.add("on"); buildLookGrid(); cancelAnimationFrame(cuRaf); cuRaf = requestAnimationFrame(drawLookPrev); }
+function closeLook() { $("custom").classList.remove("on"); cancelAnimationFrame(cuRaf); }
+// A tela abre sozinha quando a TV entra na tela de Personagens; PRONTO avisa a TV.
+$("cuDone").onclick = () => { send({ type: "lookReady" }); try { navigator.vibrate?.(25); } catch {} };
+document.querySelectorAll("#cuTabs button").forEach(b => b.onclick = () => {
+  cuTab = b.dataset.t; document.querySelectorAll("#cuTabs button").forEach(x => x.classList.toggle("on", x === b)); buildLookGrid(); $("cuGrid").scrollTop = 0;
+});
+function setLookPart(part, id) {
+  look[part] = id; lookEdited = true; lookT = performance.now();
+  store.set("duelo_look", JSON.stringify(look)); send({ type: "look", ...look });
+  try { navigator.vibrate?.(15); } catch {}
+  buildLookGrid();
+}
+function buildLookGrid() {
+  const grid = $("cuGrid"), top = grid.scrollTop; grid.innerHTML = "";
+  for (const [id, name] of LISTS[cuTab]) {
+    const b = document.createElement("button"); b.className = "opt";
+    const taken = cuTab === "color" && takenColors.includes(id);
+    b.classList.toggle("sel", look[cuTab] === id); b.classList.toggle("taken", taken);
+    const cv = document.createElement("canvas"); cv.width = cv.height = 128; const c = cv.getContext("2d");
+    if (cuTab === "color") {
+      drawLookPreview(c, { ...look, color: id }, 60, 84, 1.05, 0);
+    } else if (cuTab === "outfit") {
+      drawLookPreview(c, { color: look.color, outfit: id, hat: "nenhum" }, 60, 74, .98, 0);
+    } else {
+      // Close na cabeça pra ver bem o chapéu.
+      c.translate(64, 84); c.scale(2.2, 2.2);
+      c.fillStyle = LOOK_OUT; c.beginPath(); c.arc(0, 0, 15.5, 0, 7); c.fill(); c.fillStyle = look.color; c.beginPath(); c.arc(0, 0, 13, 0, 7); c.fill();
+      c.fillStyle = "#fff"; c.beginPath(); c.ellipse(5, -1, 4, 5, 0, 0, 7); c.fill(); c.fillStyle = LOOK_OUT; c.beginPath(); c.arc(6.5, -1, 2.2, 0, 7); c.fill();
+      drawHatShape(c, id, look.color, 0);
+    }
+    const lab = document.createElement("span"); lab.textContent = name;
+    b.append(cv, lab);
+    b.onclick = () => { if (!taken) setLookPart(cuTab, id); };
+    grid.appendChild(b);
+  }
+  grid.scrollTop = top;
+  $("cuName").textContent = `${lookName(LOOK_COLORS, look.color)} · ${lookName(LOOK_OUTFITS, look.outfit)} · ${lookName(LOOK_HATS, look.hat)}`;
+}
+function drawLookPrev(ts) {
+  const cv = $("cuPrev"), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  const c = cv.getContext("2d"), k = Math.min(cv.width / 90, cv.height / 160);
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(cv.width / 2, cv.height / 2 + 66 * k, 30 * k, 6 * k, 0, 0, 7); c.fill();
+  drawLookPreview(c, look, cv.width / 2 - 4 * k, cv.height / 2 + 20 * k, k, ts / 1000);
+  cuRaf = requestAnimationFrame(drawLookPrev);
+}
+</script>
+</body>
+</html>

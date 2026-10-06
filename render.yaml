@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: duelo-medieval
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: DUELO_ONLINE
+        value: "1"
+      - key: PYTHON_VERSION
+        value: "3.12.7"
